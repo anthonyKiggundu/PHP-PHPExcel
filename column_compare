@@ -1,0 +1,372 @@
+<?php
+
+require_once dirname(__FILE__) . '/../Classes/PHPExcel.php';
+header('Content-Type: text/html; charset=utf-8');
+
+class Gemeinde
+
+{
+	protected $_PHPExcel;
+	
+	protected $_filetype;
+	
+	public function __construct( $filename1 = null ) {
+		if( isset( $filename1 ) ) {
+			$this->load( $filename1 );
+		}
+	}
+	
+	public function load( $filename1 ) {
+		try {
+			$this->_filetype = $this->_getFiletype( $filename1 );
+		
+			$objReader = PHPExcel_IOFactory::createReader($this->_filetype );
+		
+			$this->_PHPExcel = $objReader->load( $filename1 );
+			}catch(Exception $e) {
+				die($e->getMessage());
+			}
+	}
+	
+	public function getSheetContent( $sheetName = null, $useHead = true, $row_from = 1, $row_to = null,  $column_to = null ) {
+		$PHPExcel = $this->_PHPExcel;
+		$count = 1;
+		$i = 0;
+		$objWorksheet	= (isset($sheetName)) ? $PHPExcel->getSheetByName( $sheetName ) : $PHPExcel->getActiveSheet() ;
+		$column_to	= (isset($column_to))	? $column_to	: $objWorksheet->getHighestColumn();
+		$highestRow			= (isset($highestRow))		? $highestRow			: $objWorksheet->getHighestRow();
+		$row_head		= ($useHead)					? $row_from		: null;
+		
+		$arrayGemStr1 = array();
+		$arrayGemStr2 = array();
+		$arrayGemStr  = array();
+		
+		for ($row = 1, $colOrt=6,$colOrtsT =7, $colStr = 10; $row <= $highestRow; $row++) {
+			// Get cell values for Gemende sheet (Columns Ort and Strasse)
+			$cellOrt = $objWorksheet->getCellByColumnAndRow($colOrt,$row);
+			$cellStr = $objWorksheet->getCellByColumnAndRow($colStr,$row)->setDataType(PHPExcel_Cell_DataType::TYPE_STRING);
+			$cellOrtsT = $objWorksheet->getCellByColumnAndRow($colOrtsT,$row);
+			$valOrtsT = $cellOrtsT->getValue();
+			$valOrt = $cellOrt->getValue();
+			$valStr = $cellStr->getValue();
+			// array populated for strasse gemeinde but numbers stripped off
+			$onlyStr = preg_replace('/[0-9]+/','',$valStr);
+			if(is_numeric(mb_substr(trim($valStr), -1))){
+				//$strNum = substr(trim($valStr), strlen(trim($onlyStr)),-2);
+				$strNum = mb_substr(trim($valStr), -2);
+				$arrayGemStr[$i] = array("Ort"=>$valOrt,"OrtsTeil"=>$valOrtsT,"Strasse"=>trim($onlyStr),"StrNummer"=>$strNum);
+			}
+			else{
+				//$addressLetter = mb_substr(trim($valStr), -1);
+				//$addressPart = substr(trim($valStr),-4);
+				$teilen = explode(" ", $valStr);
+				//echo '<br/>'.'========='.sizeof($teilen);
+				if(sizeof($teilen) == 4)
+				{
+					$strNum = trim($teilen[2]);
+					$addressLetter = trim($teilen[3]);
+					$str = trim($teilen[0]) . ' ' .trim($teilen[1]);
+					$arrayGemStr[$i] = array("Ort"=>$valOrt,"OrtsTeil"=>$valOrtsT,"Strasse"=>$str,"StrNummer"=>$strNum,"AddLetter"=>$addressLetter);
+				}
+			
+				else{
+					$str = trim($teilen[0]);
+					$strNum = trim($teilen[1]);
+					$addressLetter = trim($teilen[2]);
+					$arrayGemStr[$i] = array("Ort"=>$valOrt,"OrtsTeil"=>$valOrtsT,"Strasse"=>$str,"StrNummer"=>$strNum,"AddLetter"=>$addressLetter);
+				}
+			
+			}
+			$i++;
+		}
+		return $arrayGemStr;
+	}
+	
+	
+
+	//	HELPER
+
+	protected function _getFiletype( $filename1 ) {
+		$suffix = $this->__getFileSuffix( $filename1 );
+		
+		switch( $suffix ) {
+			case 'xls':
+				$filetype = 'Excel5';
+				break;
+				
+			case 'xlsx':
+				$filetype = 'Excel2007';
+				break;
+			
+			default:
+				$filetype = null;
+				break;
+		}
+		
+		return $filetype;
+	}
+	
+	private function __getFileSuffix( $filename1 ) {
+		$suffix = pathinfo($filename1, PATHINFO_EXTENSION);
+		
+		return $suffix;
+	}
+
+}
+
+class Primus
+
+{
+	protected $_PHPExcel;
+
+	protected $_filetype;
+	
+	public function __construct( $filename2 = null ) {
+		if( isset( $filename2 ) ) {
+			$this->load( $filename2 );
+		}
+	}
+	
+	public function load( $filename2 ) {
+		try {
+			$this->_filetype = $this->_getFiletype( $filename2 );
+			$sheetIndex = 2;
+			$objReader = PHPExcel_IOFactory::createReader($this->_filetype );
+			$sheetnames = $objReader->listWorksheetNames($filename2);
+			$objReader->setLoadSheetsOnly($sheetnames[$sheetIndex]);
+			$this->_PHPExcel = $objReader->load( $filename2 );
+			}catch(Exception $e) {
+				die($e->getMessage());
+			}	
+	}
+
+	public function getSheetContent( $sheetName = null, $useHead = true, $row_from = 1, $highestRow = null) {
+		$PHPExcel = $this->_PHPExcel;
+		$objWorkSheet = $PHPExcel->getActiveSheet();
+		echo 'Now inside the function';
+		$column_to	 = (isset($column_to))	? $column_to	: $objWorkSheet->getHighestColumn();  
+		$highestRow			= (isset($highestRow))		? $$highestRow			: $objWorkSheet->getHighestRow();
+		$row_head		= ($useHead)					? $row_from		: null;
+
+		$arrayOrtStr = array();
+		
+		$count = 1;
+		$i = 0;
+		//$colOrtXX is column in primus sheet, $colOrts is column in Gemeinde,,the numbers are the real column numbers in the sheet
+		for ($row = 1, $colOrtXX=1, $colOrtsTeil=2,$colStrXX=3,$colPostNrVon=4, $colPostNrBis=5, $colPostNrTyp=6; $row <= $highestRow; $row++) {
+			//Getting cell values for Primus Sheet (Columns PostOrt,PostOrtsteil,PostStrasse)
+			$cellOrtXX = $objWorkSheet->getCellByColumnAndRow($colOrtXX,$row);
+			$cellStrXX = $objWorkSheet->getCellByColumnAndRow($colStrXX,$row)->setDataType(PHPExcel_Cell_DataType::TYPE_STRING);
+			$cellOrtsTeil = $objWorkSheet->getCellByColumnAndRow($colOrtsTeil,$row);
+			$cellPostNrVon = $objWorkSheet->getCellByColumnAndRow($colPostNrVon,$row);
+			$cellPostNrBis = $objWorkSheet->getCellByColumnAndRow($colPostNrBis,$row);
+			$cellPostNrTyp = $objWorkSheet->getCellByColumnAndRow($colPostNrTyp,$row);
+			$valOrtXX = $cellOrtXX->getValue();
+			$valStrXX = $cellStrXX->getValue();
+			$valOrtsTeil = $cellOrtsTeil->getValue();
+			$valPostNrVon = $cellPostNrVon->getValue();
+			$valPostNrBis = $cellPostNrBis->getValue();
+			$valPostNrTyp = $cellPostNrTyp->getValue();
+		
+			// Go through the Strasse column, only pick cells with Ort Bad Rothenfelde..compare and write
+			if($valOrtXX == "Bad Rothenfelde"){
+				// Creating associative array with Ortsteil and Strasse from Primus sheet
+				$arrayOrtStr[$i] = array("OrtsTeil"=>$valOrtsTeil,"Strasse"=>$valStrXX,"PostNrVon"=>$valPostNrVon,"PostNrBis"=>$valPostNrBis,"PostNrTyp"=>$valPostNrTyp);
+			}
+			$i++;
+		}
+		return $arrayOrtStr;
+	}
+
+
+	/**
+		HELPER
+		**/
+	protected function _getFiletype( $filename2 ) {
+		$suffix = $this->__getFileSuffix( $filename2 );
+
+		switch( $suffix ) {
+			case 'xls':
+				$filetype = 'Excel5';
+				break;
+
+			case 'xlsx':
+				$filetype = 'Excel2007';
+				break;
+					
+			default:
+				$filetype = null;
+				break;
+		}
+
+		return $filetype;
+	}
+
+	private function __getFileSuffix( $filename2 ) {
+		$suffix = pathinfo($filename2, PATHINFO_EXTENSION);
+
+		return $suffix;
+	}
+
+
+	/**
+		ABSTRACT
+		**/
+
+}
+
+
+class ProcessArrays
+
+{
+	protected  $_PHPExcel;
+
+	protected $_filetype;
+	
+	public function __construct( $filename = null ) {
+		if( isset( $filename ) ) {
+			$this->load( $filename);
+		}
+	}
+
+	public function load( $filename) {
+	try {
+			$this->_filetype = $this->_getFiletype( $filename );
+			$sheetIndex = 0;
+			$objReader = PHPExcel_IOFactory::createReader($this->_filetype );
+			$sheetnames = $objReader->listWorksheetNames($filename);
+			$objReader->setLoadSheetsOnly($sheetnames[$sheetIndex]);
+			$this->_PHPExcel = $objReader->load( $filename );
+			}catch(Exception $e) {
+				die($e->getMessage());
+			}	
+	}
+		
+	public function compareArrays($primusResults, $gemeindResults){
+		$PHPExcel = $this->_PHPExcel;
+		$objWorkSheet = $PHPExcel->getActiveSheet();
+		$highestRow = $objWorkSheet->getHighestRow();
+		
+		foreach($gemeindResults as $gemeindRec){
+			reset($primusResults);
+			$found = false;
+			while( !$found && list($row, $primusRec) = each($primusResults) ) {
+				$record = array();
+					if( $gemeindRec['Strasse'] == $primusRec['Strasse'] ) {
+						$record = $primusRec;
+						$found = true;
+						$newArray[$row] = $record;
+					}		
+				}	
+			}
+			
+		$arrayEmptyOrts = array();	
+		$myRow = 2;
+		for ($i = 2, $cellOrt = 6, $colOrt = 7, $colStr = 10; $i <= $highestRow; $i++) {
+			$cellOrt = $objWorkSheet->getCellByColumnAndRow($colOrt,$i);
+			$cellOrtsEmpty = $objWorkSheet->getCellByColumnAndRow($colOrt,$i);
+			$cellStr = $objWorkSheet->getCellByColumnAndRow($colStr,$i);
+			$valOrt = $cellOrt->getValue();
+			$valColOrt = $cellOrtsEmpty->getValue();
+			$valColStr = $cellStr->getValue();
+			$teilen = explode(" ", $valColStr);
+			//$onlyStr = preg_replace('/[0-9]+/','',$valColStr);
+			//echo '<br/>'.'========='.sizeof($teilen);
+			if(sizeof($teilen) == 4)
+			{
+				$str = trim($teilen[0]) . ' ' .trim($teilen[1]);
+				$strNum = trim($teilen[2]);
+			}
+			elseif((sizeof($teilen) == 4) && (is_numeric($teilen[3])) ){
+				$str = trim($teilen[0]) . ' ' .trim($teilen[1]).' ' .trim($teilen[2]);
+				$strNum = trim($teilen[3]);
+			}
+				
+			elseif((sizeof($teilen) == 3) && (is_numeric($teilen[2])) ){
+				$str = trim($teilen[0]) . ' ' .trim($teilen[1]);
+				$strNum = trim($teilen[2]);
+			}
+			else{
+				$str = trim($teilen[0]);
+				$strNum = trim($teilen[1]);
+			}
+			
+			if($valColOrt == NULL || $valColOrt == ''){			
+				reset($newArray);
+				$myCol = 7;
+				$colPostTyp = 11;
+				//$gefunden = false;
+				while( list($row, $proRecord) = each($newArray)){
+					if($proRecord['Strasse'] == $str)  {
+						echo '<br/>'. 'Match found..';
+						echo '<br/>'.$proRecord['Strasse'].'===///===='. $str;
+						if(($strNum % 2)== 0){
+							$PHPExcel->getActiveSheet()->setCellValueExplicitByColumnAndRow($myCol,$myRow,$proRecord['OrtsTeil']);
+							$PHPExcel->getActiveSheet()->setCellValueExplicitByColumnAndRow($colPostTyp,$myRow,'Gerade');
+						}
+						else{
+							$PHPExcel->getActiveSheet()->setCellValueExplicitByColumnAndRow($myCol,$myRow,$proRecord['OrtsTeil']);
+							$PHPExcel->getActiveSheet()->setCellValueExplicitByColumnAndRow($colPostTyp,$myRow,'Ungerade');
+						}
+					}
+				}
+				$myRow++;
+			}
+			
+		}
+		$objWriter = PHPExcel_IOFactory::createWriter($PHPExcel, 'Excel5');
+		$objWriter->save('Gemeinde_BadX.xls');
+		return $newArray;
+	}
+	
+
+	/**
+		HELPER
+		**/
+	protected function _getFiletype( $filename ) {
+		$suffix = $this->__getFileSuffix( $filename );
+
+		switch( $suffix ) {
+			case 'xls':
+				$filetype = 'Excel5';
+				break;
+
+			case 'xlsx':
+				$filetype = 'Excel2007';
+				break;
+					
+			default:
+				$filetype = null;
+				break;
+		}
+
+		return $filetype;
+	}
+
+	private function __getFileSuffix( $filename ) {
+		$suffix = pathinfo($filename, PATHINFO_EXTENSION);
+
+		return $suffix;
+	}
+
+
+	/**
+		ABSTRACT
+		**/
+	//abstract public function getContent();
+
+}
+$filename = "Gemeinde_BadX.xls"; // Kopie von original File (Gemeinde_Bad_Rothenfelde)
+$filename1 = "Gemeinde_Bad_Rothenfelde.xlsx";
+$filename2 = "PRIMUS-SEP_Datenaufbereitung.xlsx";
+$objGemeinde = new Gemeinde($filename1);
+$objPrimus = new Primus($filename2);
+$primusResults = $objPrimus->getSheetContent();
+$gemeindResults = $objGemeinde->getSheetContent();
+$objProcessArray = new ProcessArrays( $filename);
+$processResults = $objProcessArray->compareArrays($primusResults, $gemeindResults);
+print("We got here so far //////////");
+print("\n========================================================= \n");
+echo '<br/>';
+
+?>
